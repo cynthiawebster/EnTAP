@@ -342,6 +342,12 @@ void ModDiamond::parse() {
     fp64 coverage;                  // Coverage
     // ------------------------------------------------------------------ //
 
+    std::chrono::duration<double> max_alignment_add = std::chrono::duration<double>(0);
+    std::chrono::duration<double> max_get_species = std::chrono::duration<double>(0);
+    std::chrono::duration<double> max_get_contam = std::chrono::duration<double>(0);
+    std::chrono::duration<double> max_get_taxonomy = std::chrono::duration<double>(0);
+
+
 #ifdef TEST_SIM_PARSE_01
     uint16 test_ct = 0;
     const uint16 TEST_COUNT_MAX = 100;       // Parse 100 lines only of each file
@@ -393,11 +399,17 @@ void ModDiamond::parse() {
             }
 
             // get species from database alignment title
+            auto start_get_species = std::chrono::system_clock::now();
             species = get_species(stitle);
+            auto end_get_species = std::chrono::system_clock::now();
             // get taxonomic information with species
+            auto start_get_taxonomy = std::chrono::system_clock::now();
             taxEntry = mpEntapDatabase->get_tax_entry(species);
+            auto end_get_taxonomy = std::chrono::system_clock::now();
             // get contaminant information
+            auto start_get_contam = std::chrono::system_clock::now();
             contam_info = is_contaminant(taxEntry.lineage, mContaminateTaxons);
+            auto end_get_contam = std::chrono::system_clock::now();
 
             // If this is a UniProt match and pull back info if so
             if (is_uniprot) {
@@ -445,8 +457,50 @@ void ModDiamond::parse() {
             simSearchResults.is_informative ? simSearchResults.yes_no_inform = YES_FLAG :
                     simSearchResults.yes_no_inform  = NO_FLAG;
 
+            auto start_alignment_add = std::chrono::system_clock::now();
+
             query->add_alignment(mExecutionState, mSoftwareFlag,
                     simSearchResults, output_path, mInputLineage);
+
+            auto end_alignment_add = std::chrono::system_clock::now();
+
+            std::chrono::duration<double> elapsed_alignment_add = end_alignment_add - start_alignment_add;
+            std::chrono::duration<double> elapsed_get_taxonomy = end_get_taxonomy - start_get_taxonomy;
+            std::chrono::duration<double> elapsed_get_species = end_get_species - start_get_species;
+            std::chrono::duration<double> elapsed_get_contam= end_get_contam - start_get_contam;
+
+            std::stringstream out_ss;
+            if (elapsed_alignment_add > max_alignment_add) {
+                max_alignment_add = elapsed_alignment_add;
+                out_ss <<
+                    "ALIGN_MAX [" << qseqid << "]" << "[" << sseqid << "]" << elapsed_alignment_add.count() << " seconds";
+                FS_dprint(out_ss.str());
+                out_ss.str("");
+            }
+
+            if (elapsed_get_contam > max_get_contam) {
+                max_get_contam = elapsed_get_contam;
+                out_ss <<
+                       "CONTAM_MAX [" << qseqid << "]" << "[" << sseqid << "]" << elapsed_get_contam.count() << " seconds";
+                FS_dprint(out_ss.str());
+                out_ss.str("");
+            }
+
+            if (elapsed_get_species > max_get_species) {
+                max_get_species = elapsed_get_species;
+                out_ss <<
+                       "SPECIES_MAX [" << qseqid << "]" << "[" << sseqid << "]" << elapsed_get_species.count() << " seconds";
+                FS_dprint(out_ss.str());
+                out_ss.str("");
+            }
+
+            if (elapsed_get_taxonomy> max_get_taxonomy) {
+                max_get_taxonomy = elapsed_get_taxonomy;
+                out_ss <<
+                       "TAXON_MAX [" << qseqid << "]" << "[" << sseqid << "]" << elapsed_get_taxonomy.count() << " seconds";
+                FS_dprint(out_ss.str());
+                out_ss.str("");
+            }
 
 #ifdef TEST_SIM_PARSE_01
             if (++test_ct >= TEST_COUNT_MAX) {
@@ -454,6 +508,9 @@ void ModDiamond::parse() {
             }
 #endif
         } // END WHILE LOOP
+
+        // Print timing stats
+
 
         // Finished parsing and adding to alignment data, being to calc stats
         FS_dprint("File parsed, calculating statistics and writing output...");
