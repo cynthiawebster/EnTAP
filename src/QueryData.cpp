@@ -486,6 +486,7 @@ void QueryData::final_statistics(std::string &outpath) {
     mpFileSystem->format_stat_stream(ss, "Final Annotation Statistics");
     ss <<
        "Total Sequences: "                  << count_total_sequences;
+       "Annotation rate: "		    << (count_sim_hits * 100.0 / count_total_sequences) << "%";
 
     if (DATA_FLAG_GET(SUCCESS_EXPRESSION)) {
         ss <<
